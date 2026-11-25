@@ -26,11 +26,13 @@ BENEFIT_TYPES = {"cash_savings", "avoided_cost", "productivity", "incremental_pr
 
 def validate(df: pd.DataFrame, required: list[str], name: str) -> list[str]:
     """Plain English problems with an uploaded table. Empty list means it can be used."""
-    if df is None or df.empty:
-        return [f"{name} has no rows."]
+    if df is None:
+        return [f"{name} could not be read."]
     missing = [c for c in required if c not in df.columns]
     if missing:
         return [f"{name} is missing column(s): {', '.join(missing)}."]
+    if df.empty:
+        return [f"{name} has no rows."]
     if name == "Apps file":
         names = df["app"].astype(str).str.strip()
         d = sorted(names[names.duplicated()].unique())
@@ -74,7 +76,7 @@ def prepare_transactions(txns: pd.DataFrame, apps: pd.DataFrame, fx: dict, overr
     """Returns (clean ledger, issues table). Original rows are never altered; we add columns."""
     t = txns.copy()
     t["date"] = pd.to_datetime(t["date"], errors="coerce")
-    t["amount"] = pd.to_numeric(t["amount"], errors="coerce")
+    t["amount"] = parse_money(t["amount"])
     t["currency"] = t["currency"].fillna("USD").str.upper().str.strip()
     t["type"] = t["type"].fillna("recurring").str.lower().str.strip()
     vmap = build_vendor_map(apps, overrides)
@@ -278,12 +280,22 @@ def opportunities(roll: pd.DataFrame, as_of: pd.Timestamp, util_floor: float = 8
             for _, small in retire.iterrows():
                 if pd.notna(small["roi"]) and (pd.isna(keep["roi"]) or small["roi"] >= keep["roi"]):
                     continue  # it earns more per dollar than the tool we would keep
+                # moving users needs seats on the tool we keep; pay for any beyond its spare seats
+                spare = max(0, int(keep["purchased"]) - int(keep["active"])) if pd.notna(keep["active"]) else 0
+                movers = int(small["active"]) if pd.notna(small["active"]) else 0
+                extra = max(0, movers - spare)
+                keep_seat = keep["recurring"] / keep["purchased"] if keep["purchased"] else 0
+                net = small["recurring"] - extra * keep_seat
+                if net <= 0:
+                    continue
                 ops.append(dict(app=small["app"], type="Overlapping tools",
                                 action=f"{len(g)} {cat} tools. Move {_n(small['active'])} users from "
                                        f"{small['app']} to {keep['app']} ({_n(keep['active'])} active) and retire it",
-                                low=0.5 * small["recurring"], high=small["recurring"], confidence="Medium",
-                                evidence=f"{small['app']} costs ${small['recurring']:,.0f} a year in subscriptions; "
-                                         "check the teams do not use it for a different job; migration cost not included"))
+                                low=0.5 * net, high=net, confidence="Medium",
+                                evidence=f"{small['app']} costs ${small['recurring']:,.0f} a year; "
+                                         + (f"{keep['app']} needs {extra} more seats (${extra * keep_seat:,.0f}). " if extra else
+                                            f"{keep['app']} has {spare} spare seats. ")
+                                         + "Check the teams do not use it for a different job; migration cost not included"))
     df = pd.DataFrame(ops, columns=["app", "type", "action", "low", "high", "confidence", "evidence"])
     if df.empty:
         return df.assign(mid=pd.Series(dtype=float), counts_in_total=pd.Series(dtype=bool))
@@ -302,8 +314,11 @@ def _n(x) -> str:
     return "an unknown number of" if pd.isna(x) else f"{int(x)}"
 
 
-def monthly_trend(t: pd.DataFrame) -> pd.DataFrame:
-    used = t[~t["excluded"]]
+def monthly_trend(t: pd.DataFrame, as_of=None) -> pd.DataFrame:
+    """Matched spend by month, inside the same 12 month window as the headline cost."""
+    used = t[~t["excluded"] & t["app"].notna()]
+    if as_of is not None:
+        used = used[(used["date"] > as_of - pd.DateOffset(months=12)) & (used["date"] <= as_of)]
     m = used.groupby(used["date"].dt.to_period("M"))["amount_usd"].sum().reset_index()
     m["month"] = m["date"].dt.to_timestamp()
     return m[["month", "amount_usd"]]

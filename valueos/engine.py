@@ -126,6 +126,8 @@ def payback_months(flows_monthly) -> Result:
         if m > 0 and prev < 0 <= cum:
             frac = (-prev / f) if f != 0 else Decimal(0)
             return Result(D(m - 1) + frac, "Undiscounted, interpolated within the month.")
+    if all(D(f) == 0 for f in flows_monthly):
+        return Result(None, "No costs or benefits entered.")
     if cum >= 0 and flows_monthly and D(flows_monthly[0]) >= 0:
         return Result(Decimal(0), "No upfront outlay.")
     return Result(None, "Does not pay back within the horizon.")
@@ -186,6 +188,9 @@ def break_even_adoption(c: Case) -> Result:
         cc = Case(**{**c.__dict__, "adoption_target": a, "adoption_start": min(c.adoption_start, a)})
         return case_flows(cc)["npv"]
     lo, hi = 0.0, 1.0
+    base = case_flows(c)
+    if base["total_cost"] == 0:
+        return Result(None, "There is no cost to cover.")
     if f(hi) < 0:
         return Result(None, "Even 100% adoption does not pay back over this horizon.")
     if f(lo) >= 0:
