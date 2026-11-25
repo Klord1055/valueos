@@ -28,7 +28,7 @@ The golden cases from the spec are covered by tests: a $72K cost with $198K of b
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
-python -m pytest -q tests   # 23 tests
+python -m pytest -q tests
 ```
 
 ## Cost
