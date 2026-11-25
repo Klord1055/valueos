@@ -526,7 +526,7 @@ with tabs[7]:
     st.markdown("""
 **Cost (TCO).** Every spend line matched to an app in the 12 months to the chosen date: subscriptions, one time
 costs (setup, training, consulting), less refunds and credits. Foreign currency converts at the rate in the FX
-table. Possible duplicates (same vendor, amount and date) are excluded and listed in Data check.
+table. Possible duplicates (same vendor, amount, date and type) are excluded and listed in Data check.
 
 **Value.** Each claim has a type (cash savings, avoided cost, productivity, incremental profit, risk reduction),
 an evidence class and an approval status. Only approved claims in the classes chosen in the left panel count.
