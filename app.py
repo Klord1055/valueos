@@ -18,6 +18,8 @@ importlib.reload(ui)  # pick up ui.py changes on hot redeploy
 from ui import GOLD, GREEN, GREY, NAVY, RED, intro, note, setup, takeaway, wrap
 from valueos import engine as E
 from valueos import portfolio as P
+E = importlib.reload(E)  # hot redeploys keep old modules loaded otherwise
+P = importlib.reload(P)
 
 st.set_page_config(page_title="ValueOS", page_icon="📊", layout="wide")
 setup()
