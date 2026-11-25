@@ -1,0 +1,4 @@
+currency,usd_per_unit,as_of,source
+USD,1.0,2026-10-31,base
+EUR,1.0981,2026-10-31,Sample rate for the demo; replace with your treasury rate
+GBP,1.27,2026-10-31,Sample rate for the demo; replace with your treasury rate

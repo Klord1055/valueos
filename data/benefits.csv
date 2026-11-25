@@ -1,0 +1,15 @@
+claim_id,app,benefit_type,annual_amount,evidence_class,status,owner,source,overlap_group
+B01,Salesforce,incremental_profit,310000,measured,approved,Sales Ops,"CRM win rate study, FY26 H1",
+B02,Salesforce,productivity,95000,estimated,approved,Sales Ops,"Rep time survey, n=62",sales-admin
+B03,HubSpot,incremental_profit,64000,measured,approved,Marketing,"Attributed pipeline, 40% margin",
+B04,HubSpot,productivity,22000,estimated,approved,Marketing,Campaign build time logs,sales-admin
+B05,ChatGPT Enterprise,productivity,168000,estimated,approved,Operations,"Time saved survey, 50% realization",
+B06,Claude,productivity,92000,measured,approved,Engineering,PR cycle time before/after,
+B07,ChatGPT Enterprise,cash_savings,36000,verified,approved,Finance,Cancelled translation vendor contract,
+B08,DocuSign,avoided_cost,21000,verified,approved,Legal,Courier and printing invoices stopped,
+B09,Slack,productivity,60000,estimated,approved,IT,Meeting reduction survey,
+B10,Jira,productivity,30000,estimated,pending,Engineering,"Sprint throughput, awaiting finance review",
+B11,Tableau,productivity,8000,estimated,approved,Finance,Report automation hours,
+B12,Figma,productivity,26000,measured,approved,Product,Design handoff time logs,
+B13,Asana,productivity,40000,projected,approved,PMO,Vendor business case,
+B14,Zoom,avoided_cost,18000,verified,approved,IT,"Travel spend reduction, finance verified",

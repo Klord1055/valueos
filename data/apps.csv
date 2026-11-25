@@ -1,0 +1,13 @@
+app,vendor,category,owner,purchased_seats,active_users_30d,renewal_date,notice_days
+Slack,Slack Technologies,Messaging,IT,420,371,2027-01-15,60
+Microsoft Teams,Microsoft,Messaging,IT,400,138,2027-06-30,90
+Zoom,Zoom Video Communications,Video meetings,IT,300,121,2026-12-20,30
+Salesforce,Salesforce,CRM,Sales Ops,85,79,2027-03-31,90
+HubSpot,HubSpot,Marketing automation,Marketing,25,22,2027-08-01,60
+ChatGPT Enterprise,OpenAI,AI assistant,IT,150,97,2027-02-28,30
+Claude,Anthropic,AI assistant,IT,60,54,2027-05-31,30
+Asana,Asana,Project management,PMO,180,64,2026-12-31,60
+Jira,Atlassian,Project management,Engineering,120,112,2027-04-30,30
+DocuSign,DocuSign,E-signature,Legal,40,31,2027-07-15,60
+Tableau,Salesforce Tableau,Analytics,Finance,35,9,2027-01-31,60
+Figma,Figma,Design,Product,30,28,2027-09-30,30
