@@ -53,7 +53,8 @@ def load_sample():
 
 def read_upload(f):
     try:
-        return pd.read_csv(f) if f.name.lower().endswith(".csv") else pd.read_excel(f)
+        return (pd.read_csv(f, sep=None, engine="python", encoding="utf-8-sig")
+                if f.name.lower().endswith(".csv") else pd.read_excel(f))
     except Exception as exc:  # noqa: BLE001
         st.sidebar.error(f"Could not read {f.name}: {exc}")
         return None
@@ -123,7 +124,7 @@ if txn is None or apps is None:
     st.stop()
 problems += P.validate(txn, P.TXN_COLS, "Spend file")
 problems += P.validate(apps, P.APP_COLS, "Apps file")
-if claims is not None and not claims.empty:
+if claims is not None and (not claims.empty or set(P.CLAIM_COLS) - set(claims.columns)):
     problems += P.validate(claims, P.CLAIM_COLS, "Value file")
 problems += P.validate(fx_df, ["currency", "usd_per_unit"], "FX file")
 if problems:
@@ -133,7 +134,11 @@ if problems:
 
 apps = apps.copy()
 apps["app"] = apps["app"].astype(str).str.strip()
-apps["purchased_seats"] = pd.to_numeric(apps["purchased_seats"], errors="coerce").fillna(0).astype(int)
+seat_raw = apps["purchased_seats"].copy()
+apps["purchased_seats"] = pd.to_numeric(apps["purchased_seats"], errors="coerce")
+unreadable_seats = apps.loc[apps["purchased_seats"].isna(), "app"].tolist()
+apps["purchased_seats"] = apps["purchased_seats"].fillna(0).astype(int)
+unreported_active = apps.loc[pd.to_numeric(apps["active_users_30d"], errors="coerce").isna(), "app"].tolist()
 apps["active_users_30d"] = pd.to_numeric(apps["active_users_30d"], errors="coerce")  # blank stays unknown, not 0
 fx = {str(r["currency"]).upper(): float(r["usd_per_unit"]) for _, r in fx_df.iterrows()
       if pd.notna(pd.to_numeric(r["usd_per_unit"], errors="coerce"))}
@@ -228,12 +233,12 @@ with tabs[0]:
         st.subheader("Do these first")
         if ops.empty:
             st.write("No savings ideas under the current rules.")
-        for _, o in ops[ops["counts_in_total"]].head(5).iterrows():
+        for _, o in ops[ops["counts_in_total"]].sort_values("mid", ascending=False).head(5).iterrows():
             st.markdown(f"**{o['app']}** · {o['type']}  \n{o['action']}  \n"
                         f"<span style='color:{GREEN};font-weight:600'>{k(o['low'])} to {k(o['high'])} a year</span>"
                         f" · {o['confidence']} confidence", unsafe_allow_html=True)
     st.subheader("Spend by month")
-    tr = P.monthly_trend(ledger)
+    tr = P.monthly_trend(ledger, as_of_ts)
     fig = go.Figure(go.Bar(x=tr["month"], y=tr["amount_usd"], marker_color=NAVY,
                            hovertemplate="%{x|%b %Y}: %{y:$,.0f}<extra></extra>"))
     fig.update_layout(height=280, yaxis=dict(tickprefix="$", tickformat="~s"), margin=dict(t=10))
@@ -344,7 +349,7 @@ with tabs[3]:
     q = st.text_input("Filter by vendor, app or department", placeholder="e.g. zoom")
     lv = ledger.copy()
     if q:
-        mask = lv[["vendor", "app", "department"]].astype(str).apply(lambda s: s.str.contains(q, case=False)).any(axis=1)
+        mask = lv[["vendor", "app", "department"]].astype(str).apply(lambda s: s.str.contains(q, case=False, regex=False)).any(axis=1)
         lv = lv[mask]
     st.dataframe(lv[["txn_id", "date", "vendor", "app", "department", "type", "amount", "currency", "fx_rate",
                      "amount_usd", "excluded"]].sort_values("date", ascending=False), hide_index=True,
@@ -390,6 +395,13 @@ with tabs[4]:
     if float(tot["value_without_cost"]) > 0:
         st.warning(f"{k(tot['value_without_cost'])} of value belongs to apps with no cost in this period, so it is "
                    "left out of ROI. Check the spend file or the period.")
+    if unreadable_seats or unreported_active:
+        st.subheader("App rows to check")
+        rows = [{"app": a, "problem": "Seat count is blank or not a number, so it counts as 0 seats and no seat ideas run"}
+                for a in unreadable_seats]
+        rows += [{"app": a, "problem": "Active users not reported, so license use shows n/a and no seat ideas run"}
+                 for a in unreported_active]
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     if overrides:
         st.caption("Manual mappings: " + ", ".join(f"{a} → {b}" for a, b in overrides.items()))
         if st.button("Clear manual mappings"):
@@ -425,7 +437,11 @@ with tabs[5]:
     verdict_ok = out["npv"] > 0
     vc = GREEN if verdict_ok else RED
     pb = out["payback"]
-    st.markdown(
+    empty_case = out["total_cost"] == 0 and out["total_benefit"] == 0
+    if empty_case:
+        st.info("Enter a price, setup cost or hours saved to model a purchase.")
+    else:
+        st.markdown(
         f"<div style='border:2px solid {vc};border-radius:8px;padding:12px 18px;margin:8px 0'>"
         f"<div style='font-size:1.5rem;font-weight:700;color:{vc}'>"
         f"{'Worth it' if verdict_ok else 'Not worth it at these numbers'}: NPV {k(out['npv'])}</div>"
