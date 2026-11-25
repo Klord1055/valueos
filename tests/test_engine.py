@@ -176,7 +176,7 @@ def test_opportunities_do_not_double_count():
 
 def test_validate_reports_missing_columns():
     assert P.validate(pd.DataFrame({"a": [1]}), ["a", "b"], "File") == ["File is missing column(s): b."]
-    assert P.validate(pd.DataFrame(), ["a"], "File") == ["File has no rows."]
+    assert P.validate(pd.DataFrame(columns=["a"]), ["a"], "File") == ["File has no rows."]
 
 
 def test_portfolio_roi_from_sums_not_average():
@@ -248,3 +248,37 @@ def test_unknown_active_users_skips_reclaim_and_zero_notice_kept():
 def test_irr_above_range_reported_high():
     r = E.irr([-1000, 19300, 26890])
     assert r.ok and r.value >= 1000
+
+
+# ---------- stress test fixes ----------
+
+def test_money_text_amounts_parsed():
+    t = ledger([["1", "2026-05-01", "Zoom", "$1,234.50", "USD", "IT", "recurring"]])
+    L, issues = P.prepare_transactions(t, APPS, FX)
+    assert L.loc[0, "amount_usd"] == 1234.5 and "Bad amount" not in set(issues["issue"])
+
+
+def test_consolidation_charges_extra_seats_on_kept_tool():
+    apps = APPS.copy()
+    apps["active_users_30d"] = [40, 95]  # Teams has 5 spare seats; moving 40 Zoom users needs 35 more
+    t = ledger([["1", "2026-05-01", "Zoom", 12000, "USD", "IT", "recurring"],
+                ["2", "2026-05-01", "Microsoft", 6000, "USD", "IT", "recurring"]])
+    L, _ = P.prepare_transactions(t, apps, FX)
+    r = P.app_rollup(L, apps, claims([]), pd.Timestamp("2026-10-31"))
+    o = P.opportunities(r, pd.Timestamp("2026-10-31"))
+    row = o[o["type"] == "Overlapping tools"].iloc[0]
+    assert approx(row["high"], 12000 - 35 * 60)
+
+
+def test_empty_business_case_is_not_contradictory():
+    c = E.Case(price_per_seat_month=0, setup_cost=0, hours_saved_per_user_week=0)
+    out = E.case_flows(c)
+    assert not out["payback"].ok and not E.break_even_adoption(c).ok
+
+
+def test_monthly_trend_matches_headline_window():
+    t = ledger([["1", "2026-05-01", "Zoom", 100, "USD", "IT", "recurring"],
+                ["2", "2024-05-01", "Zoom", 999, "USD", "IT", "recurring"],
+                ["3", "2026-05-01", "Unknown", 50, "USD", "IT", "recurring"]])
+    L, _ = P.prepare_transactions(t, APPS, FX)
+    assert P.monthly_trend(L, pd.Timestamp("2026-10-31"))["amount_usd"].sum() == 100
